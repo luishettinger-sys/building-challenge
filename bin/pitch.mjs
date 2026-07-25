@@ -10,7 +10,7 @@ import { execFile } from 'node:child_process'
 
 import { findeLeads, leseWebsite } from '../src/firecrawl.mjs'
 import { analysiere, baueSeite, schreibeMail } from '../src/schritte.mjs'
-import { veroeffentliche, pruefeNetlify } from '../src/deploy.mjs'
+import { veroeffentliche, pruefeNetlify, ermittleTeam } from '../src/deploy.mjs'
 import { baueCockpit } from '../src/cockpit.mjs'
 import { laufNummer, schreibeBericht } from '../src/bericht.mjs'
 import * as ui from '../src/ui.mjs'
@@ -25,7 +25,8 @@ async function main() {
 
   await ui.schritt('Werkzeuge prüfen', async () => {
     await pruefeNetlify()
-  })
+    if (!opt.team) opt.team = await ermittleTeam()
+  }, () => (opt.team ? `Netlify-Team: ${opt.team}` : 'Netlify: Standardkonto'))
 
   const leads = await ui.schritt(`Leads suchen`, async () => {
     const gefunden = await findeLeads(opt.zielgruppe, opt.anzahl, { land: opt.land, ort: opt.ort })
@@ -92,7 +93,7 @@ async function verarbeite(lead, i, ordner, opt) {
   ui.leadSchritt(lead.host, `${analyse.firma} — ${analyse.schwachstellen.length} Schwachstellen`)
 
   const html = await baueSeite(analyse, seite)
-  if (!/^<!DOCTYPE html/i.test(html)) throw new Error('Claude hat kein vollständiges HTML-Dokument geliefert.')
+  if (html.length < 2500) throw new Error('Die gebaute Seite ist verdächtig kurz — Ergebnis verworfen.')
 
   await mkdir(join(ordner, slug), { recursive: true })
   await writeFile(join(ordner, slug, 'index.html'), html, 'utf8')

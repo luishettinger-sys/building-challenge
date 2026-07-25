@@ -16,6 +16,19 @@ function netlify(args) {
   })
 }
 
+/** Holt den Team-Slug des angemeldeten Kontos — der Anzeigename taugt dafür nicht. */
+export async function ermittleTeam() {
+  try {
+    const out = await netlify(['api', 'listAccountsForUser', '--data', '{}'])
+    const start = out.indexOf('[')
+    if (start === -1) return ''
+    const konten = JSON.parse(out.slice(start))
+    return konten[0]?.slug ?? ''
+  } catch {
+    return '' // ohne Team-Angabe nimmt Netlify das Standardkonto
+  }
+}
+
 /**
  * Legt eine frische Netlify-Site an und veröffentlicht den Ordner darin.
  * Bewusst eine Site pro Lauf: verschickte Mail-Links bleiben so dauerhaft gültig,
@@ -37,16 +50,20 @@ export async function veroeffentliche(ordner, siteName, team) {
 
 /** Prüft vorab, ob die CLI da und eingeloggt ist — besser jetzt scheitern als nach 3 Minuten Arbeit. */
 export async function pruefeNetlify() {
-  try {
-    const out = await netlify(['status'])
-    if (/Not logged in|You are not logged in/i.test(out)) {
-      throw new Error('Netlify ist nicht eingeloggt. Führe "netlify login" aus.')
-    }
-    return true
-  } catch (e) {
-    if (/ENOENT/.test(e.message)) {
-      throw new Error('Netlify-CLI fehlt. Installiere sie mit "npm i -g netlify-cli" und melde dich an.')
-    }
-    throw e
+  // "status" endet mit Fehlercode, wenn der Ordner nicht mit einem Projekt verlinkt ist.
+  // Das ist hier normal — uns interessiert nur, ob jemand angemeldet ist.
+  const ausgabe = await new Promise((fertig) => {
+    execFile('netlify', ['status'], { timeout: 60000 }, (fehler, stdout, stderr) => {
+      if (fehler && /ENOENT/.test(fehler.code ?? fehler.message)) return fertig({ fehlt: true })
+      fertig({ text: `${stdout}${stderr}` })
+    })
+  })
+
+  if (ausgabe.fehlt) {
+    throw new Error('Netlify-CLI fehlt. Installiere sie mit "npm i -g netlify-cli" und melde dich an.')
   }
+  if (/Not logged in|You are not logged in|netlify login/i.test(ausgabe.text)) {
+    throw new Error('Netlify ist nicht eingeloggt. Führe "netlify login" aus.')
+  }
+  return true
 }
