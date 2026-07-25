@@ -15,6 +15,20 @@ const ZEICHEN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
 
 const dauer = (ms) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`)
 
+// Fehlermeldungen fremder Werkzeuge können Schlüssel und Tokens enthalten.
+// Was hier durchläuft, landet im Terminal und womöglich in einem Screencast.
+const SCHLUESSEL = [
+  /\bfc-[A-Za-z0-9_-]{8,}/g,
+  /\bnfp_[A-Za-z0-9_-]{8,}/g,
+  /\b(?:Bearer|token|key)\s*[:=]?\s*[A-Za-z0-9._-]{16,}/gi,
+  /\b[A-Za-z0-9_-]{40,}\b/g,
+]
+
+/** Entfernt alles, was nach Schlüssel aussieht, aus einer Ausgabe. */
+export function redigiere(text) {
+  return SCHLUESSEL.reduce((t, muster) => t.replace(muster, '«Schlüssel entfernt»'), String(text ?? ''))
+}
+
 export function kopf(zielgruppe, anzahl) {
   console.log('')
   console.log(`  ${tuerkis('◆')} ${fett('Pitch-Maschine')}`)
@@ -64,7 +78,16 @@ export const leadSchritt = (host, was) => console.log(`    ${grau('·')} ${host}
 export const leadFertig = (host, firma) => console.log(`    ${gruen('✓')} ${host} ${grau('—')} ${fett(firma)} ${grau('fertig')}`)
 
 export function fehlerZuLead(host, fehler) {
-  console.log(`    ${gelb('!')} ${host} ${grau('übersprungen:')} ${fehler.message.split('\n')[0]}`)
+  console.log(`    ${gelb('!')} ${host} ${grau('übersprungen:')} ${redigiere(fehler.message.split('\n')[0])}`)
+}
+
+export function hinweis(text) {
+  console.log(`  ${grau('·')} ${redigiere(text)}`)
+}
+
+export function erledigt(text) {
+  console.log(`  ${gruen('✓')} ${redigiere(text)}`)
+  console.log('')
 }
 
 export function fazit(leads, cockpit, ordner, uebersprungen) {
@@ -86,7 +109,7 @@ export function abbruch(fehler) {
   stoppe()
   console.log('')
   console.log(`  ${rot('✗ Abgebrochen')}`)
-  console.log(`    ${fehler.message}`)
+  console.log(`    ${redigiere(fehler.message)}`)
   console.log('')
 }
 
@@ -97,6 +120,7 @@ export function hilfe() {
   ${fett('Aufruf')}
     pitch "Zahnarztpraxen in Wiesbaden"
     pitch "Steuerberater München" --anzahl 5
+    pitch --loeschen 20260725-1930-malerbetrieb-wiesbaden
 
   ${fett('Optionen')}
     -n, --anzahl <zahl>   Wie viele Leads (1-8, Standard 3)
@@ -104,9 +128,14 @@ export function hilfe() {
         --land <code>     Ländercode (Standard "de")
         --team <slug>     Netlify-Team für den Deploy
         --kein-browser    Cockpit am Ende nicht öffnen
+        --loeschen <id>   Nimmt die Entwürfe eines Laufs wieder vom Netz
 
   ${fett('Was passiert')}
     Firmen suchen · Websites lesen · Schwachstellen finden · neue Startseite
-    bauen · live stellen · Mail schreiben · Cockpit öffnen.
+    bauen · prüfen · live stellen · Mail schreiben · Cockpit öffnen.
+
+  ${fett('Was live geht')}
+    Nur der Ordner out/<lauf>/site — die eigenen Entwürfe, mit Impressum und
+    noindex. Screenshots fremder Seiten, Mails und Cockpit bleiben lokal.
 `)
 }

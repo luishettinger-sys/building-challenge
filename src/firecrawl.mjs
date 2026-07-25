@@ -19,12 +19,24 @@ function apiKey() {
   }
 }
 
+// Hartes Zeitlimit: ein hängender Abruf darf nie den ganzen Lauf blockieren.
+const ZEITLIMIT_MS = 90_000
+
 async function call(path, body) {
-  const res = await fetch(API + path, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey()}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  const abbruch = AbortSignal.timeout(ZEITLIMIT_MS)
+  let res
+  try {
+    res = await fetch(API + path, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: abbruch,
+    })
+  } catch (e) {
+    if (e?.name === 'TimeoutError' || abbruch.aborted)
+      throw new Error(`Firecrawl ${path} hat nicht innerhalb von ${ZEITLIMIT_MS / 1000} s geantwortet.`)
+    throw e
+  }
   if (!res.ok) throw new Error(`Firecrawl ${path} → HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
   const json = await res.json()
   if (!json.success) throw new Error(`Firecrawl ${path} → ${JSON.stringify(json).slice(0, 200)}`)
@@ -83,7 +95,7 @@ export async function leseWebsite(url) {
       { type: 'screenshot', fullPage: false, viewport: { width: 1280, height: 800 } },
     ],
     onlyMainContent: false,
-    timeout: 45000,
+    timeout: 60000,
   })
   return {
     markdown: (d.markdown ?? '').slice(0, 14000),

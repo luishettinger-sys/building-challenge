@@ -8,7 +8,7 @@
 //   out/<lauf>/site/   → wird deployt: nur die eigenen Entwürfe
 //   out/<lauf>/…       → bleibt lokal: Screenshots fremder Seiten, Mails, Cockpit
 
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 
@@ -16,7 +16,7 @@ import { findeLeads, leseWebsite } from '../src/firecrawl.mjs'
 import { analysiere, baueSeite, schreibeMail } from '../src/schritte.mjs'
 import { pruefeSeite, korrekturHinweis } from '../src/pruefe.mjs'
 import { schriften, baueImpressum, ROBOTS_TXT, HEADERS_DATEI, baueStartseite } from '../src/vorlage.mjs'
-import { veroeffentliche, pruefeNetlify, ermittleTeam } from '../src/deploy.mjs'
+import { veroeffentliche, pruefeNetlify, ermittleTeam, loescheSite, findeSiteId } from '../src/deploy.mjs'
 import { baueCockpit } from '../src/cockpit.mjs'
 import { laufNummer, schreibeBericht } from '../src/bericht.mjs'
 import * as ui from '../src/ui.mjs'
@@ -25,6 +25,7 @@ const WURZEL = resolve(import.meta.dirname, '..')
 
 async function main() {
   const opt = argumente(process.argv.slice(2))
+  if (opt.loeschen) return nimmVomNetz(opt.loeschen)
   if (!opt.zielgruppe) return ui.hilfe()
 
   ui.kopf(opt.zielgruppe, opt.anzahl)
@@ -59,12 +60,14 @@ async function main() {
 
   // Erst live stellen, dann die Mails schreiben: so steht in jeder Mail die echte,
   // klickbare URL — keine geratene. Es wird genau einmal deployt.
-  const basis = await ui.schritt('Entwürfe live stellen', async () => {
+  const netz = await ui.schritt('Entwürfe live stellen', async () => {
     await schreibePflichtdateien(siteOrdner, fertig)
     return veroeffentliche(siteOrdner, lauf.siteName, opt.team)
-  }, (url) => `${url} (nur die Entwürfe, ohne Screenshots und Mails)`)
+  }, (n) => `${n.url} (nur die Entwürfe, ohne Screenshots und Mails)`)
 
+  const basis = netz.url
   for (const l of fertig) l.neueSeite = `${basis}/${l.slug}/`
+  await schreibeLaufDatei(ordner, lauf, netz, opt, fertig)
 
   await ui.schritt('Mails schreiben', async () => {
     await Promise.all(
@@ -150,6 +153,56 @@ async function baueGepruefteSeite(lead, analyse, seite) {
   return { html, befund }
 }
 
+/**
+ * Merkt sich, was dieser Lauf im Netz angelegt hat. Ohne diese Datei wüsste
+ * "pitch --loeschen" nicht, welche Site gemeint ist.
+ */
+async function schreibeLaufDatei(ordner, lauf, netz, opt, leads) {
+  await writeFile(
+    join(ordner, 'lauf.json'),
+    JSON.stringify(
+      {
+        id: lauf.id,
+        zielgruppe: opt.zielgruppe,
+        erstellt: new Date().toISOString(),
+        siteName: netz.siteName,
+        siteId: netz.siteId,
+        url: netz.url,
+        entwuerfe: leads.map((l) => ({ firma: l.analyse.firma, host: l.host, seite: l.neueSeite })),
+      },
+      null,
+      2
+    ) + '\n',
+    'utf8'
+  )
+}
+
+/** pitch --loeschen <lauf-id>: nimmt die Entwürfe eines Laufs wieder vom Netz. */
+async function nimmVomNetz(laufId) {
+  const datei = join(WURZEL, 'out', laufId, 'lauf.json')
+  let lauf
+  try {
+    lauf = JSON.parse(await readFile(datei, 'utf8'))
+  } catch {
+    throw new Error(`Kein Lauf "${laufId}" gefunden. Erwartet wird ${datei}.`)
+  }
+  if (lauf.geloescht) {
+    ui.hinweis(`Dieser Lauf wurde bereits am ${lauf.geloescht} vom Netz genommen.`)
+    return
+  }
+
+  ui.hinweis(`Lauf ${lauf.id} · ${lauf.entwuerfe?.length ?? 0} Entwürfe · ${lauf.url}`)
+
+  const siteId = lauf.siteId || (await findeSiteId(lauf.siteName))
+  if (!siteId) throw new Error(`Zur Site "${lauf.siteName}" ließ sich keine Projekt-Kennung finden.`)
+
+  await ui.schritt('Netlify-Site löschen', () => loescheSite(siteId), () => `${lauf.siteName} ist weg`)
+
+  lauf.geloescht = new Date().toISOString()
+  await writeFile(datei, JSON.stringify(lauf, null, 2) + '\n', 'utf8')
+  ui.erledigt(`${lauf.url} ist nicht mehr erreichbar. Die Dateien liegen weiter in out/${lauf.id}.`)
+}
+
 /** Impressum, robots.txt, _headers und eine neutrale Startseite für die Site. */
 async function schreibePflichtdateien(siteOrdner, leads) {
   await Promise.all([
@@ -190,6 +243,7 @@ function argumente(argv) {
     ort: 'Germany',
     team: process.env.NETLIFY_TEAM || '',
     keinBrowser: false,
+    loeschen: '',
     absender: {
       name: process.env.PITCH_ABSENDER || 'Luis Hettinger',
       firma: process.env.PITCH_FIRMA || '',
@@ -203,6 +257,7 @@ function argumente(argv) {
     else if (a === '--land') opt.land = argv[++i]
     else if (a === '--team') opt.team = argv[++i]
     else if (a === '--kein-browser') opt.keinBrowser = true
+    else if (a === '--loeschen' || a === '--löschen') opt.loeschen = String(argv[++i] ?? '').trim()
     else if (a === '--hilfe' || a === '-h') return {}
     else frei.push(a)
   }

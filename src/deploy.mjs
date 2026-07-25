@@ -9,7 +9,7 @@ function netlify(args) {
     execFile('netlify', args, { timeout: TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024 }, (fehler, stdout, stderr) => {
       if (fehler) {
         const grund = (stderr || stdout || fehler.message).trim().slice(0, 400)
-        return reject(new Error(`Netlify-Deploy fehlgeschlagen: ${grund}`))
+        return reject(new Error(`Netlify (${args[0]}) fehlgeschlagen: ${grund}`))
       }
       resolve(stdout)
     })
@@ -45,7 +45,31 @@ export async function veroeffentliche(ordner, siteName, team) {
   const info = JSON.parse(stdout.slice(start))
   const url = info.url ?? info.deploy_url ?? info.ssl_url
   if (!url) throw new Error('Netlify hat keine URL zurückgegeben.')
-  return url.replace(/\/$/, '')
+  return { url: url.replace(/\/$/, ''), siteId: info.site_id ?? '', siteName }
+}
+
+/** Sucht die Projekt-Kennung zu einem Sitenamen — Notnagel für ältere Läufe. */
+export async function findeSiteId(siteName) {
+  try {
+    const out = await netlify(['api', 'listSites', '--data', '{}'])
+    const start = out.indexOf('[')
+    if (start === -1) return ''
+    const sites = JSON.parse(out.slice(start))
+    return sites.find((s) => s.name === siteName)?.id ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Löscht die Netlify-Site eines Laufs. Ein Entwurf, der nicht mehr gewünscht
+ * ist, muss in Sekunden verschwinden können — das ist die Zusage aus dem
+ * Impressum und aus jeder Mail.
+ */
+export async function loescheSite(siteId) {
+  if (!siteId) throw new Error('Keine Projekt-Kennung übergeben.')
+  await netlify(['sites:delete', siteId, '--force'])
+  return true
 }
 
 /** Prüft vorab, ob die CLI da und eingeloggt ist — besser jetzt scheitern als nach 3 Minuten Arbeit. */
