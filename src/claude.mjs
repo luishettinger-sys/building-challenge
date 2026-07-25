@@ -8,8 +8,10 @@ const TIMEOUT_MS = 5 * 60 * 1000
 /**
  * Schickt einen Prompt an Claude und gibt die Antwort als Text zurück.
  * Der Prompt geht über stdin, damit auch lange Website-Inhalte durchpassen.
+ * Jeder Aufruf hat ein hartes Zeitlimit: ein hängender Schritt darf nie den
+ * ganzen Lauf blockieren.
  */
-export function frageClaude(prompt, { model = 'sonnet', system } = {}) {
+export function frageClaude(prompt, { model = 'sonnet', system, zeitlimit = TIMEOUT_MS } = {}) {
   // "--tools ''" nimmt Claude alle Werkzeuge weg. Wichtig: sonst schreibt er die
   // Landingpage als Datei auf die Platte, statt sie uns zurückzugeben.
   const args = ['-p', '--output-format', 'json', '--tools', '', '--model', model]
@@ -21,8 +23,8 @@ export function frageClaude(prompt, { model = 'sonnet', system } = {}) {
     let err = ''
     const timer = setTimeout(() => {
       kind.kill('SIGKILL')
-      reject(new Error('Claude hat nicht rechtzeitig geantwortet (5 Min Zeitlimit).'))
-    }, TIMEOUT_MS)
+      reject(new Error(`Claude hat nicht rechtzeitig geantwortet (Zeitlimit ${Math.round(zeitlimit / 1000)} s).`))
+    }, zeitlimit)
 
     kind.stdout.on('data', (d) => (out += d))
     kind.stderr.on('data', (d) => (err += d))

@@ -10,6 +10,8 @@ import { execFile } from 'node:child_process'
 
 import { findeLeads, leseWebsite } from '../src/firecrawl.mjs'
 import { analysiere, baueSeite, schreibeMail } from '../src/schritte.mjs'
+import { pruefeSeite, korrekturHinweis } from '../src/pruefe.mjs'
+import { schriften } from '../src/vorlage.mjs'
 import { veroeffentliche, pruefeNetlify, ermittleTeam } from '../src/deploy.mjs'
 import { baueCockpit } from '../src/cockpit.mjs'
 import { laufNummer, schreibeBericht } from '../src/bericht.mjs'
@@ -92,8 +94,8 @@ async function verarbeite(lead, i, ordner, opt) {
   const analyse = await analysiere(lead, seite)
   ui.leadSchritt(lead.host, `${analyse.firma} — ${analyse.schwachstellen.length} Schwachstellen`)
 
-  const html = await baueSeite(analyse, seite)
-  if (html.length < 2500) throw new Error('Die gebaute Seite ist verdächtig kurz — Ergebnis verworfen.')
+  const { html, befund } = await baueGepruefteSeite(lead, analyse, seite)
+  if (html.length < 4000) throw new Error('Die gebaute Seite ist verdächtig kurz — Ergebnis verworfen.')
 
   await mkdir(join(ordner, slug), { recursive: true })
   await writeFile(join(ordner, slug, 'index.html'), html, 'utf8')
@@ -105,10 +107,38 @@ async function verarbeite(lead, i, ordner, opt) {
     ...lead,
     slug,
     analyse,
+    befund,
     screenshotDatei: screenshotDatei ? `shots/${slug}.png` : null,
     neueSeite: null,
     mail: null,
   }
+}
+
+/**
+ * Baut die Seite und lässt sie durch die Prüfung laufen.
+ * Rechtsverstöße brechen den Lead sofort ab. Handwerkliche Mängel bekommen
+ * genau einen zweiten Versuch mit konkretem Korrekturhinweis — danach wird
+ * dieser Lead übersprungen, nie der ganze Lauf.
+ */
+async function baueGepruefteSeite(lead, analyse, seite) {
+  const pruefOptionen = {
+    original: seite.markdown,
+    markenSchriften: schriften(seite.branding).marken,
+  }
+
+  let { html } = await baueSeite(analyse, seite)
+  let befund = pruefeSeite(html, pruefOptionen)
+  if (befund.bestanden) return { html, befund }
+
+  if (befund.hart.length) throw new Error(`Rechtsprüfung nicht bestanden: ${befund.hart.join(' ')}`)
+
+  ui.leadSchritt(lead.host, `Prüfung: ${befund.weich.length} Beanstandung(en), Seite wird neu gebaut`)
+  ;({ html } = await baueSeite(analyse, seite, korrekturHinweis(befund)))
+  befund = pruefeSeite(html, pruefOptionen)
+  if (!befund.bestanden) throw new Error(`Auch der zweite Entwurf fiel durch: ${befund.meldung}`)
+
+  befund.meldung = 'Qualitätsprüfung bestanden (nach einer Korrekturrunde)'
+  return { html, befund }
 }
 
 /** Screenshot mitnehmen statt verlinken — die Firecrawl-URLs laufen ab. */

@@ -1,6 +1,18 @@
-// Die drei Denk-Schritte der Pitch-Maschine: analysieren, bauen, anschreiben.
+// Die drei Denk-Schritte der Pitch-Maschine: analysieren, texten, anschreiben.
+//
+// Wichtig für Schritt 2: Claude baut kein HTML mehr. Er entscheidet, WAS auf der
+// Seite steht (Reihenfolge, Überschriften, Texte) — WIE das aussieht, legt
+// src/vorlage.mjs im Code fest. Agent ist Regie, Code ist Kamera.
 
-import { frageClaudeJSON, frageClaudeHTML, frageClaude } from './claude.mjs'
+import { frageClaudeJSON, frageClaude } from './claude.mjs'
+import { baueSeiteHTML, farbwelt, schriften, saeubere, ICON_NAMEN } from './vorlage.mjs'
+
+export const ZEITLIMIT = {
+  scrape: 90_000,
+  analyse: 120_000,
+  seitenbau: 180_000,
+  mail: 120_000,
+}
 
 /** Schritt 1 — Website lesen und die echten Schwachstellen benennen. */
 export async function analysiere(lead, seite) {
@@ -49,83 +61,217 @@ Regeln:
 - "potenzial": 1-10, wie viel eine neue Startseite dieser Firma bringen würde.
 - Schreib auf Deutsch, sachlich, nicht überheblich. Der Firmeninhaber soll das
   lesen können, ohne sich angegriffen zu fühlen.`,
-    { model: 'sonnet' }
+    { model: 'sonnet', zeitlimit: ZEITLIMIT.analyse }
   )
+
   daten.schwachstellen = (daten.schwachstellen ?? []).slice(0, 3)
+  daten.kontakt = {
+    telefon: saeubere(daten.kontakt?.telefon, 40),
+    email: saeubere(daten.kontakt?.email, 80),
+    adresse: saeubere(daten.kontakt?.adresse, 120),
+  }
   return daten
 }
 
-/** Schritt 2 — die neue Startseite bauen, in den Farben der Firma. */
-export function baueSeite(analyse, seite) {
-  const farben = seite.branding?.colors ?? {}
-  return frageClaudeHTML(
-    `Baue die neue Startseite für diese Firma. Sie wird live ins Netz gestellt und
-dem Inhaber als Vorschlag geschickt. Sie muss auf den ersten Blick deutlich besser
-wirken als das, was er heute hat.
+/**
+ * Schritt 2 — die Texte der neuen Startseite. Zurück kommt fertiges HTML,
+ * gerendert vom festen Gerüst.
+ * @param {string} korrektur  Hinweis aus einer fehlgeschlagenen Prüfung
+ */
+export async function baueSeite(analyse, seite, korrektur = '') {
+  const roh = await frageClaudeJSON(inhaltsPrompt(analyse, seite, korrektur), {
+    model: 'sonnet',
+    zeitlimit: ZEITLIMIT.seitenbau,
+  })
+
+  const inhalt = formeInhalt(roh, analyse)
+  const html = baueSeiteHTML(inhalt, {
+    firma: analyse.firma,
+    farben: farbwelt(seite.branding),
+    schriften: schriften(seite.branding),
+    kontakt: analyse.kontakt,
+  })
+  return { html, inhalt }
+}
+
+function inhaltsPrompt(analyse, seite, korrektur) {
+  return `Du schreibst die Texte für einen neuen Startseiten-Entwurf. Layout, Farben,
+Typografie und Abstände stehen bereits fest — du lieferst ausschließlich Inhalte
+und die Reihenfolge der Abschnitte.
 
 FIRMA: ${analyse.firma}
 BRANCHE: ${analyse.branche}
 ORT: ${analyse.ort}
-LEISTUNGEN: ${JSON.stringify(analyse.kernleistungen)}
+LEISTUNGEN LAUT ALTER SEITE: ${JSON.stringify(analyse.kernleistungen)}
 ZIELGRUPPE: ${analyse.zielgruppe}
-TONALITÄT: ${analyse.tonalitaet}
-KONTAKT: ${JSON.stringify(analyse.kontakt)}
-STÄRKE: ${analyse.staerke}
+TONALITÄT DER FIRMA: ${analyse.tonalitaet}
 DAS SOLL DIE NEUE SEITE BESSER MACHEN: ${JSON.stringify(analyse.schwachstellen)}
 
-MARKENFARBEN DER FIRMA (aus der alten Seite ausgelesen — benutze sie, damit die
-Seite nach DIESER Firma aussieht und nicht nach Vorlage):
-${JSON.stringify(farben)}
-
-INHALTE DER ALTEN SEITE (nimm echte Texte, Namen und Leistungen von dort):
+INHALT DER ALTEN SEITE (Faktenquelle, NICHT Textvorlage):
 """
 ${seite.markdown.slice(0, 9000)}
 """
 
-Anforderungen:
-- Ein einziges, vollständiges HTML-Dokument. Alles inline: CSS im <style>, kein
-  externes Framework, keine externen Schriften, keine externen Bilder, kein
-  JavaScript von fremden Servern. Die Seite muss offline aussehen wie online.
-- Auf Deutsch. Echte Inhalte der Firma, keine Blindtexte, kein "Lorem ipsum",
-  keine Platzhalter in eckigen Klammern.
+WAS DU ÜBERNEHMEN DARFST — und was nicht:
+- Übernehmen erlaubt sind reine Sachangaben: Firmenname, Leistungen, Ort,
+  Adresse, Telefon, E-Mail, Öffnungszeiten.
+- Fließtexte musst du komplett neu formulieren. Kein einziger Satz der alten
+  Seite darf wörtlich auftauchen, auch keine halben Sätze.
+- Weder erfinden noch übernehmen darfst du: Kundenstimmen, Zitate, Bewertungen,
+  Sterne, Zertifikate, Siegel, Auszeichnungen, Namen von Personen, Jahreszahlen,
+  Gründungsjahre, Mitarbeiterzahlen, Kundenzahlen, Prozentwerte und Preise.
+  Ein Abschnitt, der ohne so etwas nicht funktioniert, entfällt ersatzlos.
+- Verwende keinerlei Bilder, Fotos, Logos oder externe Ressourcen. Kein <img>,
+  keine externen URLs. Nur Farbflächen, CSS-Verläufe aus den Markenfarben und
+  Inline-SVG-Icons, die du selbst zeichnest. Kein Logo: der Firmenname
+  erscheint ausschließlich als Textschriftzug.
 
-WAHRHEITSPFLICHT — das ist die wichtigste Regel:
-- Verwende ausschließlich Angaben, die oben im Inhalt der alten Seite wirklich
-  vorkommen. Erfinde NICHTS: keine Kundenstimmen, keine Bewertungen oder Sterne,
-  keine Auszeichnungen, Siegel oder Zertifikate, keine Zahlen (Jahre Erfahrung,
-  Patientenzahlen, Prozente), keine Namen von Personen, keine Öffnungszeiten und
-  keine Preise, die dort nicht stehen.
-- Wenn eine Information fehlt, lass den ganzen Abschnitt weg. Eine kürzere, wahre
-  Seite ist besser als eine vollständige, erfundene.
+SPRACHE:
+- Deutsch, Sie-Form, ruhig und konkret. So, wie ein guter Handwerker redet:
+  was er macht, für wen, und was der Kunde davon hat.
+- Verboten sind Gedankenstriche (—) im Fließtext, Emojis und diese Floskeln:
+  "in der heutigen", "Ihr Partner für", "maßgeschneidert", "ganzheitlich",
+  "Willkommen bei", "Wir freuen uns", "Exzellenz", "Leidenschaft",
+  "Ihre Zufriedenheit ist unser", "Kompetenz und", "aus einer Hand",
+  "Rundum-sorglos", "höchstem Niveau".
+- Keine Superlative und keine Werbeadjektive ohne Inhalt. Lieber ein konkretes
+  Detail als drei schöne Wörter.
 
-PFLICHT-KENNZEICHNUNG (die Seite wird öffentlich erreichbar sein):
-- Im <head>: <meta name="robots" content="noindex, nofollow">
-- Direkt nach <body> ein schmaler, ruhiger Hinweisbalken über die volle Breite,
-  gedeckte Farbe, kleine Schrift, gut lesbar:
-  "Unverbindlicher Gestaltungsentwurf · Keine offizielle Seite von ${analyse.firma}"
-- Aufbau: fixierte schlanke Navigation · Hero mit klarem Nutzenversprechen und
-  sichtbarem Haupt-Button (Termin/Kontakt/Anfrage — passend zur Branche) ·
-  Leistungen als Karten mit Icon · ein Abschnitt Vertrauen (Team, Ablauf oder
-  Argumente) · ein ruhiger Zitat- oder Aussagen-Block · Kontaktbereich mit den
-  echten Kontaktdaten · schlichter Footer.
-- Icons ausschließlich als Inline-SVG, schlicht und einheitlich (Strichstärke 1.5,
-  currentColor). Keine Emojis als Icons.
-- Statt Fotos: ruhige Flächen aus den Markenfarben, sanfte Verläufe, viel
-  Weißraum. Nichts Buntes, nichts Verspieltes.
-- Modern und wertig: großzügige Abstände, klare Typo-Hierarchie (Überschrift
-  deutlich größer als Fließtext), weiche Ecken, dezente Schatten, feine Trennlinien.
-- Vollständig responsiv über CSS-Grid/Flexbox mit relativen Einheiten. Auf dem
-  Handy einspaltig und gut lesbar, Buttons groß genug zum Antippen.
-- Zugänglich: echte Kontraste, semantische Tags, alt-Texte, sinnvolle Titel.
-- Im Footer zusätzlich ein kleiner grauer Absatz: dass dies ein unaufgefordert
-  erstellter Gestaltungsvorschlag ist, dass alle Inhalte von der öffentlich
-  erreichbaren Website des Unternehmens stammen, und dass die Seite auf Zuruf
-  sofort entfernt wird.
+GIB GENAU DIESES JSON ZURÜCK:
 
-Gib nur das HTML-Dokument aus, beginnend mit <!DOCTYPE html>. Kein Kommentar davor
-oder danach.`,
-    { model: 'sonnet' }
-  )
+{
+  "titel": "Seitentitel für den Browser-Tab, max 70 Zeichen",
+  "beschreibung": "Meta-Beschreibung, ein Satz, max 160 Zeichen",
+  "wortmarke": "Firmenname als kurzer Textschriftzug, max 30 Zeichen",
+  "hero": {
+    "auge": "Kurze Einordnung, z.B. Branche und Ort, max 45 Zeichen",
+    "titel": "Die stärkste Aussage der Seite, ein Satz, konkret, max 85 Zeichen",
+    "text": "Zwei Sätze: was die Firma macht und für wen. Max 260 Zeichen",
+    "aktion": "Text des Hauptbuttons, 2-3 Wörter",
+    "zweitAktion": "Text des zweiten, leiseren Buttons, 2-3 Wörter"
+  },
+  "abschnitte": [
+    {
+      "typ": "leistungen",
+      "menue": "ein Wort fürs Menü",
+      "auge": "Kurzlabel, max 30 Zeichen",
+      "titel": "Überschrift des Abschnitts",
+      "text": "Ein bis zwei Sätze Einleitung",
+      "punkte": [ { "titel": "Leistung", "text": "Ein bis zwei Sätze dazu" } ]
+    },
+    {
+      "typ": "ablauf",
+      "menue": "Ablauf",
+      "auge": "", "titel": "", "text": "",
+      "punkte": [ { "titel": "Schritt", "text": "Was dabei passiert" } ]
+    },
+    {
+      "typ": "argumente",
+      "menue": "Warum wir",
+      "auge": "", "titel": "", "text": "",
+      "punkte": [ { "titel": "", "text": "", "icon": "haken" } ]
+    },
+    {
+      "typ": "aussage",
+      "menue": "",
+      "titel": "Eine ruhige Aussage der Firma über ihre Arbeit, max 180 Zeichen",
+      "text": "Optional ein Satz Ergänzung"
+    },
+    { "typ": "kontakt", "menue": "Kontakt", "auge": "", "titel": "", "text": "" }
+  ]
+}
+
+Regeln für die Abschnitte:
+- 4 bis 5 Abschnitte. "leistungen" und "kontakt" sind Pflicht, "kontakt" steht
+  immer am Schluss. Aus "ablauf", "argumente" und "aussage" wählst du, was zu
+  dieser Firma wirklich passt. Jeden Typ höchstens einmal.
+- "leistungen": 3 bis 6 Punkte, aus den echten Leistungen der Firma.
+- "ablauf": 3 oder 4 Schritte, wie eine Zusammenarbeit konkret abläuft.
+- "argumente": 2 oder 3 Punkte, warum man diese Firma nimmt. Nur belegbare
+  Gründe aus dem Inhalt oben, keine Auszeichnungen, keine Zahlen.
+- "aussage" ist ein Satz der Firma über die eigene Arbeit, kein Kundenzitat.
+- "icon" wählst du aus dieser Liste: ${ICON_NAMEN.join(', ')}.
+- Die Kontaktdaten setzt der Code selbst ein. Schreib im Kontaktabschnitt nur
+  Überschrift und Einleitungstext, keine Telefonnummern und keine Adresse.
+${korrektur ? `\nKORREKTUR AUS DER LETZTEN PRÜFUNG:\n${korrektur}\n` : ''}`
+}
+
+// ────────────────────────────────────── Modellantwort in Form bringen ──────
+
+const ERLAUBT = ['leistungen', 'ablauf', 'argumente', 'aussage', 'kontakt']
+const ERSATZ_TITEL = {
+  leistungen: 'Was wir machen',
+  ablauf: 'So läuft es ab',
+  argumente: 'Warum wir',
+  aussage: '',
+  kontakt: 'Sprechen wir über Ihr Vorhaben',
+}
+const ERSATZ_MENUE = { leistungen: 'Leistungen', ablauf: 'Ablauf', argumente: 'Warum wir', aussage: '', kontakt: 'Kontakt' }
+const GRENZEN = { leistungen: [2, 6], ablauf: [2, 4], argumente: [2, 3] }
+
+/** Kappt, säubert und ergänzt, bis die Struktur garantiert renderbar ist. */
+function formeInhalt(roh, analyse) {
+  const gesehen = new Set()
+  const abschnitte = []
+
+  for (const a of Array.isArray(roh?.abschnitte) ? roh.abschnitte : []) {
+    const typ = String(a?.typ ?? '').toLowerCase().trim()
+    if (!ERLAUBT.includes(typ) || gesehen.has(typ)) continue
+
+    const punkte = (Array.isArray(a.punkte) ? a.punkte : [])
+      .map((p) => ({
+        titel: saeubere(p?.titel, 70),
+        text: saeubere(p?.text, 260),
+        icon: ICON_NAMEN.includes(String(p?.icon)) ? String(p.icon) : 'haken',
+      }))
+      .filter((p) => p.titel)
+
+    const grenze = GRENZEN[typ]
+    if (grenze && punkte.length < grenze[0]) continue // halbe Abschnitte lieber weglassen
+
+    const menueText = saeubere(a.menue, 18) || ERSATZ_MENUE[typ]
+    gesehen.add(typ)
+    abschnitte.push({
+      typ,
+      id: typ === 'argumente' ? 'vertrauen' : typ,
+      menueText,
+      imMenue: Boolean(menueText),
+      auge: saeubere(a.auge, 40),
+      titel: saeubere(a.titel, typ === 'aussage' ? 200 : 90) || ERSATZ_TITEL[typ],
+      text: saeubere(a.text, 300),
+      punkte: grenze ? punkte.slice(0, grenze[1]) : [],
+    })
+  }
+
+  // Kontakt ist Pflicht und steht immer am Schluss.
+  const ohneKontakt = abschnitte.filter((a) => a.typ !== 'kontakt')
+  const kontakt = abschnitte.find((a) => a.typ === 'kontakt') ?? {
+    typ: 'kontakt',
+    id: 'kontakt',
+    menueText: 'Kontakt',
+    imMenue: true,
+    auge: 'Kontakt',
+    titel: ERSATZ_TITEL.kontakt,
+    text: '',
+    punkte: [],
+  }
+
+  const hero = roh?.hero ?? {}
+  const ortZusatz = analyse.ort ? ` in ${analyse.ort}` : ''
+
+  return {
+    titel: saeubere(roh?.titel, 80) || `${analyse.firma} · ${analyse.branche}${ortZusatz}`,
+    beschreibung: saeubere(roh?.beschreibung, 170) || `${analyse.branche}${ortZusatz}.`,
+    wortmarke: saeubere(roh?.wortmarke, 34) || analyse.firma,
+    hero: {
+      auge: saeubere(hero.auge, 50) || `${analyse.branche}${ortZusatz}`.trim(),
+      titel: saeubere(hero.titel, 110) || analyse.firma,
+      text: saeubere(hero.text, 300) || analyse.zielgruppe,
+      aktion: saeubere(hero.aktion, 26) || 'Kontakt aufnehmen',
+      zweitAktion: saeubere(hero.zweitAktion, 26) || 'Leistungen ansehen',
+    },
+    abschnitte: [...ohneKontakt, kontakt],
+  }
 }
 
 /** Schritt 3 — die Mail, die den Link auf die neue Seite trägt. */
@@ -143,17 +289,19 @@ ABSENDER: ${absender.name}${absender.firma ? ', ' + absender.firma : ''}
 
 Regeln:
 - Erste Zeile: "Betreff: ..." — konkret, kein Werbe-Ton, keine Großbuchstaben-Schreie.
-- Danach die Mail. Höchstens 130 Wörter. Kurze Absätze.
+- Danach die Mail. Höchstens 140 Wörter. Kurze Absätze.
 - Ton: ein Mensch, der sich die Seite wirklich angesehen hat. Direkt, freundlich,
   auf Augenhöhe, kein Agentur-Sprech, keine Superlative, keine Emojis.
 - Aufbau: ein Satz, der zeigt dass du die Firma kennst (nimm die Stärke) · ein bis
   zwei konkrete Beobachtungen von der jetzigen Seite und was sie kosten · der
   Satz, dass du eine neue Startseite schon gebaut hast und sie hier live ansehen
   kann: ${url} · Schluss mit einer leichten Frage, die eine Antwort einfach macht.
+- Ein kurzer Satz muss klarstellen: der Entwurf ist unverbindlich, keine
+  offizielle Seite der Firma und wird auf Zuruf sofort gelöscht.
 - Kein Preis, kein Vertrag, kein Druck, keine Frist.
 - Duzen nur, wenn die Branche das trägt — im Zweifel siezen.
 - Unterschrift mit ${absender.name}.`,
-    { model: 'sonnet' }
+    { model: 'sonnet', zeitlimit: ZEITLIMIT.mail }
   )
 
   const zeilen = text.split('\n')
