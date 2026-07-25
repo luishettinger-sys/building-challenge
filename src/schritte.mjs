@@ -109,7 +109,7 @@ DAS SOLL DIE NEUE SEITE BESSER MACHEN: ${JSON.stringify(analyse.schwachstellen)}
 
 INHALT DER ALTEN SEITE (Faktenquelle, NICHT Textvorlage):
 """
-${seite.markdown.slice(0, 9000)}
+${seite.markdown}
 """
 
 WAS DU ÜBERNEHMEN DARFST — und was nicht:

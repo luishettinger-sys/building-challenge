@@ -106,6 +106,14 @@ export function pruefeSeite(html, { original = '', markenSchriften = [] } = {}) 
   if (!/href=["']impressum\.html["']/i.test(html)) hart.push('Im Footer fehlt der Link zum Impressum.')
   if (!/Unverbindlicher Gestaltungsentwurf/i.test(html)) hart.push('Der Entwurfsbanner fehlt.')
 
+  // ── hart: ohne Kontaktweg ist der Entwurf wertlos ────────────────────────
+  // Eine Startseite, die zum Anrufen auffordert und dann keine Nummer zeigt,
+  // ist schlechter als die alte Seite. Das darf nie live gehen.
+  const hatTelefon = /href=["']tel:/i.test(html)
+  const hatMail = /href=["']mailto:/i.test(html)
+  if (!hatTelefon && !hatMail)
+    hart.push('Die Seite nennt weder Telefonnummer noch E-Mail. Ein Entwurf ohne Kontaktweg ist wertlos.')
+
   // ── weich: wörtlich abgeschriebene Fließtexte ────────────────────────────
   const abgeschrieben = saetze(original).filter((s) => textKlein.includes(s))
   for (const s of abgeschrieben.slice(0, 3))

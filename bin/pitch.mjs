@@ -23,6 +23,13 @@ import * as ui from '../src/ui.mjs'
 
 const WURZEL = resolve(import.meta.dirname, '..')
 
+// Die .env liegt beim Projekt, nicht dort, wo du gerade stehst — der Befehl
+// lässt sich schließlich aus jedem Ordner aufrufen. Fehlt sie, ist das kein
+// Fehler: dann kommen die Zugänge aus den angemeldeten CLIs.
+try {
+  process.loadEnvFile?.(join(WURZEL, '.env'))
+} catch {}
+
 async function main() {
   const opt = argumente(process.argv.slice(2))
   if (opt.loeschen) return nimmVomNetz(opt.loeschen)

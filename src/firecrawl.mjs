@@ -98,10 +98,24 @@ export async function leseWebsite(url) {
     timeout: 60000,
   })
   return {
-    markdown: (d.markdown ?? '').slice(0, 14000),
+    markdown: kuerze(d.markdown ?? ''),
     screenshot: d.screenshot ?? null,
     branding: d.branding ?? null,
     titel: d.metadata?.title ?? '',
     beschreibung: d.metadata?.description ?? '',
   }
+}
+
+/**
+ * Kürzt lange Seiten auf ein für Claude verdauliches Maß — aber niemals das Ende.
+ * Telefonnummer, Adresse und Öffnungszeiten stehen fast immer ganz unten. Wer
+ * hier stumpf vorne abschneidet, behauptet später gegenüber dem Betrieb, seine
+ * Website habe keine Telefonnummer, obwohl sie im Fuß steht. Genau das ist
+ * einmal passiert.
+ */
+function kuerze(markdown, grenze = 14000) {
+  if (markdown.length <= grenze) return markdown
+  const kopf = markdown.slice(0, grenze - 4000)
+  const fuss = markdown.slice(-4000)
+  return `${kopf}\n\n[… Mittelteil gekürzt …]\n\n${fuss}`
 }
