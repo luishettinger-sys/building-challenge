@@ -181,6 +181,45 @@ export const ROBOTS_TXT = 'User-agent: *\nDisallow: /\n'
 
 export const HEADERS_DATEI = '/*\n  X-Robots-Tag: noindex, nofollow\n'
 
+/**
+ * Die Wurzel der veröffentlichten Site. Bewusst neutral: keine Firmennamen,
+ * keine Screenshots, keine Liste. Wer hier landet, soll nur wissen, was das ist
+ * und wie er es loswird.
+ */
+export function baueStartseite(anzahl) {
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Gestaltungsentwürfe</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:#fbfaf8;color:#17191c;display:grid;min-height:100vh;
+    place-items:center;font:17px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  main{max-width:34rem;padding:clamp(28px,7vw,56px)}
+  h1{font:600 clamp(26px,4vw,36px)/1.15 Georgia,serif;letter-spacing:-.01em;margin:0 0 18px}
+  p{margin:0 0 14px;color:#4a4f55}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<main>
+  <h1>Unverbindliche Gestaltungsentwürfe</h1>
+  <p>Hier liegen ${anzahl === 1 ? 'ein Entwurf' : `${anzahl} Entwürfe`} von ${esc(ANBIETER.name)}.
+     Es sind keine offiziellen Seiten der jeweils gezeigten Unternehmen, keine Angebote und
+     keine geschäftliche Verbindung. Die Entwürfe sind für Suchmaschinen gesperrt.</p>
+  <p>Die einzelnen Entwürfe sind nur über den Link erreichbar, der dem jeweiligen
+     Unternehmen zugeschickt wurde. Auf Zuruf wird ein Entwurf sofort entfernt:
+     <a href="mailto:${ANBIETER.email}">${ANBIETER.email}</a></p>
+  <p><a href="impressum.html">Impressum</a></p>
+</main>
+</body>
+</html>
+`
+}
+
 /** Anbieterkennzeichnung nach § 5 DDG — Anbieter ist Luis, nicht die Firma. */
 export function baueImpressum() {
   return `<!DOCTYPE html>

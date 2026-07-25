@@ -3,6 +3,10 @@
 //
 //   pitch "Zahnarztpraxen in Wiesbaden"
 //   pitch "Steuerberater München" --anzahl 5
+//
+// Was live geht und was nicht, ist bewusst getrennt:
+//   out/<lauf>/site/   → wird deployt: nur die eigenen Entwürfe
+//   out/<lauf>/…       → bleibt lokal: Screenshots fremder Seiten, Mails, Cockpit
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -11,7 +15,7 @@ import { execFile } from 'node:child_process'
 import { findeLeads, leseWebsite } from '../src/firecrawl.mjs'
 import { analysiere, baueSeite, schreibeMail } from '../src/schritte.mjs'
 import { pruefeSeite, korrekturHinweis } from '../src/pruefe.mjs'
-import { schriften } from '../src/vorlage.mjs'
+import { schriften, baueImpressum, ROBOTS_TXT, HEADERS_DATEI, baueStartseite } from '../src/vorlage.mjs'
 import { veroeffentliche, pruefeNetlify, ermittleTeam } from '../src/deploy.mjs'
 import { baueCockpit } from '../src/cockpit.mjs'
 import { laufNummer, schreibeBericht } from '../src/bericht.mjs'
@@ -38,12 +42,14 @@ async function main() {
 
   const lauf = laufNummer(opt.zielgruppe)
   const ordner = join(WURZEL, 'out', lauf.id)
+  const siteOrdner = join(ordner, 'site')
   await mkdir(join(ordner, 'shots'), { recursive: true })
+  await mkdir(siteOrdner, { recursive: true })
 
   // Alle Leads gleichzeitig — der langsamste bestimmt die Dauer, nicht die Summe.
   ui.abschnitt(`Leads bearbeiten (${leads.length} gleichzeitig)`)
   const ergebnisse = await Promise.all(
-    leads.map((lead, i) => verarbeite(lead, i, ordner, opt).catch((e) => {
+    leads.map((lead) => verarbeite(lead, ordner, opt).catch((e) => {
       ui.fehlerZuLead(lead.host, e)
       return null
     }))
@@ -52,11 +58,11 @@ async function main() {
   if (!fertig.length) throw new Error('Kein einziger Lead ließ sich bearbeiten. Details siehe oben.')
 
   // Erst live stellen, dann die Mails schreiben: so steht in jeder Mail die echte,
-  // klickbare URL — keine geratene.
-  const basis = await ui.schritt('Seiten live stellen', async () => {
-    await writeFile(join(ordner, 'index.html'), platzhalterCockpit(), 'utf8')
-    return veroeffentliche(ordner, lauf.siteName, opt.team)
-  }, (url) => url)
+  // klickbare URL — keine geratene. Es wird genau einmal deployt.
+  const basis = await ui.schritt('Entwürfe live stellen', async () => {
+    await schreibePflichtdateien(siteOrdner, fertig)
+    return veroeffentliche(siteOrdner, lauf.siteName, opt.team)
+  }, (url) => `${url} (nur die Entwürfe, ohne Screenshots und Mails)`)
 
   for (const l of fertig) l.neueSeite = `${basis}/${l.slug}/`
 
@@ -64,6 +70,7 @@ async function main() {
     await Promise.all(
       fertig.map(async (l) => {
         l.mail = await schreibeMail(l.analyse, l.neueSeite, opt.absender)
+        await mkdir(join(ordner, l.slug), { recursive: true })
         await writeFile(
           join(ordner, l.slug, 'mail.txt'),
           `An: ${l.analyse.kontakt?.email || '(Adresse auf der Website suchen)'}\nBetreff: ${l.mail.betreff}\n\n${l.mail.koerper}\n`,
@@ -73,18 +80,20 @@ async function main() {
     )
   }, () => `${fertig.length} Mails fertig`)
 
-  const cockpit = await ui.schritt('Cockpit bauen und veröffentlichen', async () => {
-    await writeFile(join(ordner, 'index.html'), baueCockpit(opt.zielgruppe, fertig, opt.absender), 'utf8')
+  // Das Cockpit zeigt Screenshots fremder Websites. Die bleiben auf dieser
+  // Platte — Lichtbilder anderer Leute gehören nicht ins offene Netz.
+  const cockpit = join(ordner, 'cockpit.html')
+  await ui.schritt('Cockpit bauen (bleibt lokal)', async () => {
+    await writeFile(cockpit, baueCockpit(opt.zielgruppe, fertig, opt.absender, basis), 'utf8')
     await schreibeBericht(ordner, opt, fertig, basis)
-    return veroeffentliche(ordner, lauf.siteName, opt.team)
-  }, (url) => url)
+  }, () => cockpit)
 
   ui.fazit(fertig, cockpit, ordner, ergebnisse.length - fertig.length)
   if (!opt.keinBrowser) execFile('open', [cockpit], () => {})
 }
 
-/** Ein Lead von der URL bis zur fertigen Seite auf der Platte. */
-async function verarbeite(lead, i, ordner, opt) {
+/** Ein Lead von der URL bis zur geprüften Seite im Deploy-Ordner. */
+async function verarbeite(lead, ordner, opt) {
   const slug = slugify(lead.host)
   ui.leadStart(lead.host)
 
@@ -97,8 +106,8 @@ async function verarbeite(lead, i, ordner, opt) {
   const { html, befund } = await baueGepruefteSeite(lead, analyse, seite)
   if (html.length < 4000) throw new Error('Die gebaute Seite ist verdächtig kurz — Ergebnis verworfen.')
 
-  await mkdir(join(ordner, slug), { recursive: true })
-  await writeFile(join(ordner, slug, 'index.html'), html, 'utf8')
+  await mkdir(join(ordner, 'site', slug), { recursive: true })
+  await writeFile(join(ordner, 'site', slug, 'index.html'), html, 'utf8')
 
   const screenshotDatei = await ladeScreenshot(seite.screenshot, join(ordner, 'shots', `${slug}.png`))
   ui.leadFertig(lead.host, analyse.firma)
@@ -141,6 +150,16 @@ async function baueGepruefteSeite(lead, analyse, seite) {
   return { html, befund }
 }
 
+/** Impressum, robots.txt, _headers und eine neutrale Startseite für die Site. */
+async function schreibePflichtdateien(siteOrdner, leads) {
+  await Promise.all([
+    writeFile(join(siteOrdner, 'impressum.html'), baueImpressum(), 'utf8'),
+    writeFile(join(siteOrdner, 'robots.txt'), ROBOTS_TXT, 'utf8'),
+    writeFile(join(siteOrdner, '_headers'), HEADERS_DATEI, 'utf8'),
+    writeFile(join(siteOrdner, 'index.html'), baueStartseite(leads.length), 'utf8'),
+  ])
+}
+
 /** Screenshot mitnehmen statt verlinken — die Firecrawl-URLs laufen ab. */
 async function ladeScreenshot(url, ziel) {
   if (!url) return false
@@ -153,9 +172,6 @@ async function ladeScreenshot(url, ziel) {
     return false
   }
 }
-
-const platzhalterCockpit = () =>
-  '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Pitch-Maschine</title></head><body style="background:#0b0d10"></body></html>'
 
 function slugify(text) {
   return String(text)

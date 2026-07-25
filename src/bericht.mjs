@@ -23,7 +23,8 @@ export async function schreibeBericht(ordner, opt, leads, basis) {
   const zeilen = [
     `# Pitch-Lauf: ${opt.zielgruppe}`,
     '',
-    `Cockpit: ${basis}`,
+    `Live (nur die Entwürfe): ${basis}`,
+    `Cockpit: cockpit.html in diesem Ordner — bleibt bewusst lokal.`,
     `Leads: ${leads.length}`,
     '',
     '| Firma | Ort | Potenzial | Neue Seite | Kontakt |',
@@ -44,6 +45,7 @@ export async function schreibeBericht(ordner, opt, leads, basis) {
       '',
       `Jetzige Seite: ${l.url}`,
       `Neue Seite: ${l.neueSeite}`,
+      `Prüfung: ${l.befund?.meldung ?? '—'}`,
       '',
       '**Gefundene Schwachstellen**',
       ...(l.analyse.schwachstellen ?? []).map((s) => `- **${s.titel}** — ${s.beobachtung} ${s.kostet}`),
