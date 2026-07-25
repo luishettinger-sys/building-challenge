@@ -122,8 +122,8 @@ export function hilfe() {
   ${fett('Pitch-Maschine')} — Zielgruppe rein, versandfertige Akquise-Pakete raus.
 
   ${fett('Aufruf')}
-    pitch "Zahnarztpraxen in Wiesbaden"
-    pitch "Steuerberater München" --anzahl 5
+    pitch "Malerbetriebe in Wiesbaden"
+    pitch "Dachdecker Mainz" --anzahl 5
     pitch --loeschen 20260725-1930-malerbetrieb-wiesbaden
 
   ${fett('Optionen')}
