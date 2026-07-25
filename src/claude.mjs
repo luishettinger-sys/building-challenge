@@ -10,7 +10,9 @@ const TIMEOUT_MS = 5 * 60 * 1000
  * Der Prompt geht über stdin, damit auch lange Website-Inhalte durchpassen.
  */
 export function frageClaude(prompt, { model = 'sonnet', system } = {}) {
-  const args = ['-p', '--output-format', 'json', '--allowed-tools', '', '--model', model]
+  // "--tools ''" nimmt Claude alle Werkzeuge weg. Wichtig: sonst schreibt er die
+  // Landingpage als Datei auf die Platte, statt sie uns zurückzugeben.
+  const args = ['-p', '--output-format', 'json', '--tools', '', '--model', model]
   if (system) args.push('--append-system-prompt', system)
 
   return new Promise((resolve, reject) => {
@@ -57,7 +59,15 @@ export async function frageClaudeJSON(prompt, opts = {}) {
 /** Wie frageClaude, aber die Antwort wird als reines HTML-Dokument zurückgegeben. */
 export async function frageClaudeHTML(prompt, opts = {}) {
   const roh = await frageClaude(prompt, opts)
-  return schaeleCodeblock(roh, 'html')
+  const ohneFence = schaeleCodeblock(roh, 'html')
+
+  // Sicherste Variante: das Dokument aus der Antwort herausschneiden, egal ob
+  // Claude noch einen Satz davor oder dahinter geschrieben hat.
+  const start = ohneFence.search(/<!DOCTYPE html/i)
+  const ende = ohneFence.toLowerCase().lastIndexOf('</html>')
+  if (start !== -1 && ende > start) return ohneFence.slice(start, ende + 7)
+
+  throw new Error(`Kein HTML-Dokument in Claudes Antwort (Anfang: ${roh.slice(0, 160)})`)
 }
 
 function parseJSON(text) {
