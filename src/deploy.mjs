@@ -35,17 +35,42 @@ export async function ermittleTeam() {
  * auch wenn du morgen den nächsten Lauf startest.
  */
 export async function veroeffentliche(ordner, siteName, team) {
-  const args = ['deploy', '--dir', ordner, '--prod', '--no-build', '--site-name', siteName, '--json']
-  if (team) args.push('--team', team)
-
-  const stdout = await netlify(args)
+  // Erst die Site anlegen, dann gezielt dorthin deployen. Ohne das explizite
+  // "--site <id>" nimmt die CLI die Site, mit der der Projektordner verknüpft
+  // ist — und ein neuer Lauf würde die Entwürfe des letzten überschreiben,
+  // obwohl deren Links schon in verschickten Mails stehen.
+  const site = await legeSiteAn(siteName, team)
+  const stdout = await netlify(['deploy', '--dir', ordner, '--prod', '--no-build', '--site', site.id, '--json'])
   const start = stdout.indexOf('{')
   if (start === -1) throw new Error(`Netlify-Antwort unlesbar: ${stdout.slice(0, 300)}`)
 
   const info = JSON.parse(stdout.slice(start))
   const url = info.url ?? info.deploy_url ?? info.ssl_url
   if (!url) throw new Error('Netlify hat keine URL zurückgegeben.')
-  return { url: url.replace(/\/$/, ''), siteId: info.site_id ?? '', siteName }
+  return { url: url.replace(/\/$/, ''), siteId: info.site_id || site.id, siteName }
+}
+
+/**
+ * Legt für diesen Lauf eine eigene, leere Site an. "--disable-linking" ist
+ * wichtig: sonst verknüpft die CLI den Projektordner mit der neuen Site.
+ */
+async function legeSiteAn(name, team) {
+  const args = ['sites:create', '--name', name, '--disable-linking', '--json']
+  if (team) args.push('--account-slug', team)
+  try {
+    const out = await netlify(args)
+    const start = out.indexOf('{')
+    if (start === -1) throw new Error('unlesbare Antwort')
+    const info = JSON.parse(out.slice(start))
+    const id = info.id ?? info.site_id
+    if (!id) throw new Error('keine Projekt-Kennung in der Antwort')
+    return { id, name }
+  } catch (fehler) {
+    // Name schon vergeben? Dann ist es unsere eigene Site aus einem Neustart.
+    const id = await findeSiteId(name)
+    if (id) return { id, name }
+    throw fehler
+  }
 }
 
 /** Sucht die Projekt-Kennung zu einem Sitenamen — Notnagel für ältere Läufe. */

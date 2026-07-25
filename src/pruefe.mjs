@@ -100,6 +100,12 @@ export function pruefeSeite(html, { original = '', markenSchriften = [] } = {}) 
   const externe = [...html.matchAll(/https?:\/\/[^\s"'<>)]+/gi)].map((m) => m[0])
   if (externe.length) hart.push(`Die Seite verweist nach außen: ${externe.slice(0, 3).join(', ')}`)
 
+  // ── hart: die Pflichtkennzeichnung muss dranstehen ───────────────────────
+  if (!/<meta\s+name=["']robots["']\s+content=["'][^"']*noindex/i.test(html))
+    hart.push('Die Seite trägt kein noindex im <head>.')
+  if (!/href=["']impressum\.html["']/i.test(html)) hart.push('Im Footer fehlt der Link zum Impressum.')
+  if (!/Unverbindlicher Gestaltungsentwurf/i.test(html)) hart.push('Der Entwurfsbanner fehlt.')
+
   // ── weich: wörtlich abgeschriebene Fließtexte ────────────────────────────
   const abgeschrieben = saetze(original).filter((s) => textKlein.includes(s))
   for (const s of abgeschrieben.slice(0, 3))
