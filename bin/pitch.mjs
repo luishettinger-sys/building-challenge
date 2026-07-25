@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Pitch-Maschine — Zielgruppe rein, versandfertige Akquise-Pakete raus.
 //
-//   pitch "Zahnarztpraxen in Wiesbaden"
-//   pitch "Steuerberater München" --anzahl 5
+//   pitch "Malerbetriebe in Wiesbaden"
+//   pitch "Dachdecker Mainz" --anzahl 5
 //
 // Was live geht und was nicht, ist bewusst getrennt:
 //   out/<lauf>/site/   → wird deployt: nur die eigenen Entwürfe
