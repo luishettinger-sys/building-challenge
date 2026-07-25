@@ -88,6 +88,21 @@ Anforderungen:
   JavaScript von fremden Servern. Die Seite muss offline aussehen wie online.
 - Auf Deutsch. Echte Inhalte der Firma, keine Blindtexte, kein "Lorem ipsum",
   keine Platzhalter in eckigen Klammern.
+
+WAHRHEITSPFLICHT — das ist die wichtigste Regel:
+- Verwende ausschließlich Angaben, die oben im Inhalt der alten Seite wirklich
+  vorkommen. Erfinde NICHTS: keine Kundenstimmen, keine Bewertungen oder Sterne,
+  keine Auszeichnungen, Siegel oder Zertifikate, keine Zahlen (Jahre Erfahrung,
+  Patientenzahlen, Prozente), keine Namen von Personen, keine Öffnungszeiten und
+  keine Preise, die dort nicht stehen.
+- Wenn eine Information fehlt, lass den ganzen Abschnitt weg. Eine kürzere, wahre
+  Seite ist besser als eine vollständige, erfundene.
+
+PFLICHT-KENNZEICHNUNG (die Seite wird öffentlich erreichbar sein):
+- Im <head>: <meta name="robots" content="noindex, nofollow">
+- Direkt nach <body> ein schmaler, ruhiger Hinweisbalken über die volle Breite,
+  gedeckte Farbe, kleine Schrift, gut lesbar:
+  "Unverbindlicher Gestaltungsentwurf · Keine offizielle Seite von ${analyse.firma}"
 - Aufbau: fixierte schlanke Navigation · Hero mit klarem Nutzenversprechen und
   sichtbarem Haupt-Button (Termin/Kontakt/Anfrage — passend zur Branche) ·
   Leistungen als Karten mit Icon · ein Abschnitt Vertrauen (Team, Ablauf oder
@@ -102,8 +117,10 @@ Anforderungen:
 - Vollständig responsiv über CSS-Grid/Flexbox mit relativen Einheiten. Auf dem
   Handy einspaltig und gut lesbar, Buttons groß genug zum Antippen.
 - Zugänglich: echte Kontraste, semantische Tags, alt-Texte, sinnvolle Titel.
-- Ganz unten ein kleiner, dezenter Hinweis in grau, kursiv, ca. 12px:
-  "Unverbindlicher Entwurf für ${analyse.firma} — erstellt von der Pitch-Maschine."
+- Im Footer zusätzlich ein kleiner grauer Absatz: dass dies ein unaufgefordert
+  erstellter Gestaltungsvorschlag ist, dass alle Inhalte von der öffentlich
+  erreichbaren Website des Unternehmens stammen, und dass die Seite auf Zuruf
+  sofort entfernt wird.
 
 Gib nur das HTML-Dokument aus, beginnend mit <!DOCTYPE html>. Kein Kommentar davor
 oder danach.`,
