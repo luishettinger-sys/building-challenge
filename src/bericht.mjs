@@ -5,6 +5,12 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+/** Setzt einen fehlenden Schlusspunkt, damit zwei Sätze nicht ineinanderlaufen. */
+const satzende = (s) => {
+  const t = String(s ?? '').trim()
+  return !t || /[.!?:;…]$/.test(t) ? t : t + '.'
+}
+
 /** Eindeutige Kennung für den Lauf — Datum plus Zielgruppe, damit Ordner sprechend sind. */
 export function laufNummer(zielgruppe) {
   const d = new Date()
@@ -48,7 +54,7 @@ export async function schreibeBericht(ordner, opt, leads, basis) {
       `Prüfung: ${l.befund?.meldung ?? '—'}`,
       '',
       '**Gefundene Schwachstellen**',
-      ...(l.analyse.schwachstellen ?? []).map((s) => `- **${s.titel}** — ${s.beobachtung} ${s.kostet}`),
+      ...(l.analyse.schwachstellen ?? []).map((s) => `- **${s.titel}** — ${satzende(s.beobachtung)} ${satzende(s.kostet)}`),
       '',
       '**Mail**',
       '',

@@ -5,6 +5,12 @@
 // Das Cockpit bleibt lokal. Es zeigt Screenshots fremder Websites, und die sind
 // als Lichtbilder geschützt: sie dürfen auf keinen öffentlichen Server.
 
+/** Setzt einen fehlenden Schlusspunkt, damit zwei Sätze nicht ineinanderlaufen. */
+const satzende = (s) => {
+  const t = String(s ?? '').trim()
+  return !t || /[.!?:;…]$/.test(t) ? t : t + '.'
+}
+
 const esc = (s) =>
   String(s ?? '')
     .replaceAll('&', '&amp;')
@@ -135,7 +141,7 @@ function pruefzeile(befund) {
 function karte(lead) {
   const a = lead.analyse
   const maengel = (a.schwachstellen ?? [])
-    .map((s) => `<li><b>${esc(s.titel)}</b><p>${esc(s.beobachtung)} ${esc(s.kostet)}</p></li>`)
+    .map((s) => `<li><b>${esc(s.titel)}</b><p>${esc(satzende(s.beobachtung))} ${esc(satzende(s.kostet))}</p></li>`)
     .join('')
 
   const vorher = lead.screenshotDatei
