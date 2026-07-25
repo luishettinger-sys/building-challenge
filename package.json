@@ -1,0 +1,16 @@
+{
+  "name": "pitch-maschine",
+  "version": "0.1.0",
+  "description": "Zielgruppe rein, versandfertige Akquise-Pakete raus: echte Leads, Website-Analyse, live gestellte Redesign-Seite und fertige Mail.",
+  "type": "module",
+  "bin": {
+    "pitch": "bin/pitch.mjs"
+  },
+  "scripts": {
+    "pitch": "node bin/pitch.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

@@ -12,3 +12,7 @@ __pycache__/
 # System
 .DS_Store
 *.log
+
+# Ergebnisse der Läufe (enthalten Kundendaten und Screenshots)
+out/
+.netlify/
