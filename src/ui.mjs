@@ -17,11 +17,15 @@ const dauer = (ms) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`)
 
 // Fehlermeldungen fremder Werkzeuge können Schlüssel und Tokens enthalten.
 // Was hier durchläuft, landet im Terminal und womöglich in einem Screencast.
+// Absichtlich eng gefasst: eine zu gierige Regel schwärzt Hostnamen und URLs
+// mit, und dann sieht man im Terminal nicht mehr, was der Lauf gebaut hat.
 const SCHLUESSEL = [
-  /\bfc-[A-Za-z0-9_-]{8,}/g,
-  /\bnfp_[A-Za-z0-9_-]{8,}/g,
-  /\b(?:Bearer|token|key)\s*[:=]?\s*[A-Za-z0-9._-]{16,}/gi,
-  /\b[A-Za-z0-9_-]{40,}\b/g,
+  /\bfc-[A-Za-z0-9]{12,}/g, // Firecrawl
+  /\bnfp_[A-Za-z0-9]{12,}/g, // Netlify
+  /\bsk-[A-Za-z0-9_-]{16,}/g, // OpenAI-Stil
+  /\b[A-Fa-f0-9]{32,}\b/g, // Hex-Token
+  /\b[A-Za-z0-9+]{40,}={0,2}\b/g, // Base64-Token
+  /((?:Bearer|authorization|token|api[_-]?key)["'\s:=]+)\S{12,}/gi,
 ]
 
 /** Entfernt alles, was nach Schlüssel aussieht, aus einer Ausgabe. */
