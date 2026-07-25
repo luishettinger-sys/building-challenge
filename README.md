@@ -1,42 +1,51 @@
-# SKAILE Building Challenge
+# Pitch-Maschine
 
-> Diese Datei füllst du im Laufe der Challenge aus. Die Platzhalter in eckigen
-> Klammern ersetzt du durch deine Inhalte — dein Claude Code hilft dir dabei
-> (siehe START.md).
+> SKAILE Building Challenge #2 — ein Agent, der aus einer Zielgruppe fertige
+> Akquise-Pakete macht: echte Leads, echte Analyse, echte Live-Seite, fertige Mail.
 
 ## Das Problem
 
-[1-2 Sätze: Wessen Problem löst dein Agent? Was kostet das Problem heute an
-Zeit, Geld oder Nerven?]
+Ich baue und verkaufe Websites (Kanzlei-Seiten, Landingpages, Shops). Der teuerste
+Teil daran ist nicht das Bauen — es ist die Akquise. Für einen einzigen ernsthaften
+Pitch sitze ich 60–90 Minuten: Firmen suchen, Website ansehen, Schwachstellen
+notieren, eine Mail schreiben, die nicht nach Massenmail klingt. Und selbst dann ist
+die Mail nur eine Behauptung ("ich könnte das besser") — kein Beweis. Deshalb bleibt
+Akquise liegen, und ohne Akquise kein Auftrag.
 
 ## Was der Agent macht
 
-[2-3 Sätze: Input rein → was passiert → Ergebnis raus. Einfach erklärt, so
-dass es jemand ohne Technik-Hintergrund versteht.]
+Du gibst ihm eine Zielgruppe, z.B. `pitch "Zahnarztpraxen in Wiesbaden"`. Der Agent
+sucht daraufhin echte Betriebe im Netz, ruft deren Website auf und analysiert sie auf
+konkrete Schwachstellen (kein Handy-Layout, kein klarer Termin-Button, veraltetes
+Design, langsam). Aus dem, was er dort liest, baut er der Firma **eine neue
+Startseite** — mit ihren echten Inhalten, ihrem Namen, ihren Leistungen — und stellt
+sie live ins Netz. Am Ende bekommst du pro Lead eine fertige, persönliche Mail, in der
+genau die gefundenen Schwachstellen stehen und ein Link auf die neue Seite.
+
+Aus 90 Minuten Handarbeit pro Lead werden ca. 2 Minuten Rechenzeit. Und statt einer
+Behauptung verschickst du einen Beweis, den der Empfänger anklicken kann.
 
 ## Stack
 
-- [ ] Claude Code (Agent / Skills)
+- [x] Claude Code (Agent / Skills) — Analyse, Copy, Seitenbau via `claude -p` (headless)
 - [ ] n8n
-- [ ] Sonstiges: [was?]
+- [x] Sonstiges: Node.js-Orchestrator, Firecrawl (Suche + Scraping), Netlify (Deploy)
 
 ## Setup
 
-[Wie richtet man deinen Agenten ein? Wenn du es richtig gut machen willst:
-Schreib eine INSTALL.md, die an Claude adressiert ist — so wie beim
-Video-Cutter von Sebastian. Das gibt Bonuspunkte bei Doku/Teilbarkeit.]
+Siehe **[INSTALL.md](INSTALL.md)** — die Datei ist an Claude Code adressiert. Repo
+klonen, Claude die INSTALL.md lesen lassen, er richtet den Rest ein.
 
 ## Was während der Challenge entstanden ist
 
-[2-3 Stichpunkte: Was gab es vorher schon (siehe dein Check-in-Post), was
-ist neu dazugekommen?]
+[wird beim Bauen gefüllt]
 
 ## Learnings
 
-[Die 2-3 wichtigsten Dinge, die du beim Bauen gelernt hast — auch Fails!]
+[wird beim Bauen gefüllt]
 
 ---
 
-**Demo-Video:** [Link zu Loom oder YouTube unlisted — EIN Durchlauf, ungeschnitten]
+**Demo-Video:** [folgt]
 
-*SKAILE Academy Building Challenge — [Monat/Jahr]*
+*SKAILE Academy Building Challenge — Juli 2026*
