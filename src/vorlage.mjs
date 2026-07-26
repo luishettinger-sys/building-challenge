@@ -6,10 +6,16 @@
 // und Bilder, fremde Ressourcen oder Skripte können gar nicht erst entstehen:
 // jeder Text läuft durch die Escape-Funktion, jedes Ziel durch die Linkprüfung.
 
+// Anbieter der Entwurfsseiten bin ich, nicht das vorgestellte Unternehmen.
+// Genau das ist der Kern: die Seite darf nie so wirken, als betriebe die Firma sie.
+//
+// Anschrift bewusst leer gelassen. § 5 DDG verlangt sie eigentlich — wer die
+// Entwürfe dauerhaft oder gewerblich einsetzt, trägt sie hier nach, dann
+// erscheint sie automatisch im Impressum und im Footer.
 const ANBIETER = {
   name: 'Luis Hettinger',
-  strasse: '[Straße Nr.]',
-  ort: '[PLZ Ort]',
+  strasse: '',
+  ort: '',
   email: 'luis.hettinger@gmx.de',
 }
 
@@ -250,14 +256,12 @@ export function baueImpressum() {
   <h2>Anbieter dieser Seiten</h2>
   <address>
     ${esc(ANBIETER.name)}<br>
-    ${esc(ANBIETER.strasse)}<br>
-    ${esc(ANBIETER.ort)}<br>
-    Deutschland
+    ${[ANBIETER.strasse, ANBIETER.ort].filter(Boolean).map((z) => esc(z) + '<br>').join('\n    ')}Deutschland
   </address>
   <p>E-Mail: <a href="mailto:${ANBIETER.email}">${ANBIETER.email}</a></p>
 
   <h2>Verantwortlich für den Inhalt</h2>
-  <p>${esc(ANBIETER.name)}, Anschrift wie oben.</p>
+  <p>${esc(ANBIETER.name)}, erreichbar unter der oben genannten E-Mail-Adresse.</p>
 
   <h2>Was diese Seiten sind</h2>
   <p>Hier liegen unverbindliche Gestaltungsentwürfe. Sie stammen von ${esc(ANBIETER.name)}

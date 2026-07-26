@@ -115,12 +115,40 @@ ${karten}
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-kopieren]')
     if (!b) return
-    var text = document.getElementById(b.getAttribute('data-kopieren')).innerText
-    navigator.clipboard.writeText(text).then(function () {
-      var alt = b.textContent
-      b.textContent = 'Kopiert'
+    var feld = document.getElementById(b.getAttribute('data-kopieren'))
+    var alt = b.getAttribute('data-alt') || b.textContent
+    b.setAttribute('data-alt', alt)
+
+    function melde(wort) {
+      b.textContent = wort
       setTimeout(function () { b.textContent = alt }, 1600)
-    })
+    }
+
+    // Über file:// ist die Zwischenablage je nach Browser gesperrt. Dann wird
+    // der Text markiert und mit dem alten execCommand kopiert — und wenn auch
+    // das nicht geht, sagt der Knopf das, statt einfach nichts zu tun.
+    function ueberAuswahl() {
+      try {
+        var auswahl = window.getSelection()
+        var bereich = document.createRange()
+        bereich.selectNodeContents(feld)
+        auswahl.removeAllRanges()
+        auswahl.addRange(bereich)
+        var ok = document.execCommand('copy')
+        auswahl.removeAllRanges()
+        melde(ok ? 'Kopiert' : 'Bitte von Hand kopieren')
+      } catch (fehler) {
+        melde('Bitte von Hand kopieren')
+      }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(feld.innerText).then(function () {
+        melde('Kopiert')
+      }, ueberAuswahl)
+    } else {
+      ueberAuswahl()
+    }
   })
 </script>
 </body>
